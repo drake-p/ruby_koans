@@ -5,48 +5,6 @@ require File.expand_path(File.dirname(__FILE__) + '/neo')
 # Create a program that will play the Greed Game.
 # Rules for the game are in GREED_RULES.TXT.
 
-class Player
-  attr_accessor :total_score
-  attr_reader :turn_score
-  attr_reader :dice
-
-  def initialize
-    @total_score, @turn_score, @dice = 0, 0, DiceSet.new(5)
-  end
-
-  def in_game?
-    @total_score > 0 || @turn_score >= 300
-  end
-
-  def has_turn?
-    @dice.count > 0
-  end
-
-  def end_turn
-    @total_score += @turn_score
-    @dice.count = 5
-  end
-
-  def roll
-    @dice.count > 0 ? (@dice.roll(@dice.count)) : (raise(GameError, "Your turn has ended"))
-
-    s = score(@dice.values)
-
-    @turn_score += s[:score]
-
-    case s[:scoring_dice]
-    when 0
-      @dice.count = 0
-      #@turn_score = 0
-    when @dice.count
-      @dice.count = 5
-    else
-      @dice.count -= s[:scoring_dice]
-    end
-    return s[:score]
-  end
-end
-
 class DiceSet
   attr_accessor :values
   attr_accessor :count
@@ -76,92 +34,49 @@ def score(dice)
   return {score: score, scoring_dice: scoring_dice}
 end
 
-class GameError < StandardError
+class Player
+  attr_accessor :total_score
+  attr_reader :turn_score
+  attr_reader :dice
+
+  def initialize
+    @total_score, @turn_score, @dice = 0, 0, DiceSet.new(5)
+  end
+
+  def in_game?
+    @total_score > 0 || @turn_score >= 300
+  end
+
+  def has_turn?
+    @dice.count > 0
+  end
+
+  def end_turn
+    @total_score += @turn_score if self.in_game?
+    @dice.count = 5
+  end
+
+  def roll
+    @dice.count > 0 ? (@dice.roll(@dice.count)) : (raise(GameError, "Your turn has ended"))
+
+    s = score(@dice.values)
+
+    @turn_score += s[:score]
+
+    case s[:scoring_dice]
+    when 0
+      @dice.count = 0
+      #@turn_score = 0
+    when @dice.count
+      @dice.count = 5
+    else
+      @dice.count -= s[:scoring_dice]
+    end
+    return s[:score]
+  end
 end
 
-class AboutPlayers < Neo::Koan
-	def test_can_create_a_player
-		bob = Player.new
-		assert_not_nil bob
-	end
-
-  def test_player_starts_with_certain_attributes
-    bob = Player.new
-
-    assert_equal 0, bob.turn_score
-    assert_equal 0, bob.total_score
-    assert_not_nil bob.dice
-    assert_equal false, bob.in_game?
-  end
-
-  def test_player_can_roll_dice_to_score
-    bob = Player.new
-
-    tally_before = bob.turn_score
-    score = bob.roll
-
-    assert_equal true, bob.turn_score == tally_before + score
-  end
-
-  def test_roll_multiple_times_to_accumulate_score
-    bob = Player.new
-    scores = []
-    while bob.has_turn? do
-      scores << bob.roll
-    end
-
-    assert_equal bob.turn_score, scores.inject(0) { |total, s| total + s }, scores
-  end
-
-  def test_turn_score_is_added_to_total
-    bob = Player.new
-    scores = []
-    total_before = bob.total_score
-
-    while bob.has_turn? do
-      scores << bob.roll
-    end
-    bob.end_turn
-
-    assert_equal total_before + bob.turn_score, bob.total_score
-    assert false, "#{scores}"
-  end
-
-  # def test_player_cannot_roll_out_of_turn
-  #   bert = Player.new
-  #   ernie = Player.new
-  #   game = Greed.new(bert, ernie)
-
-  #   assert_raise(GameError) { ernie.roll }
-  # end
-
-  def test_player_score_accumulates_if_in_game
-    bert = Player.new
-    ernie = Player.new
-    game = Greed.new(bert, ernie)
-
-    assert_equal bert.total_score, 0
-    bert.roll
-  end
-
-  def test_player_can_check_their_score
-
-  end
-
-  def test_player_can_win_or_lose
-    
-  end
-
-  # def test_player_is_in_or_out_of_game
-  #   bert = Player.new
-  #   ernie = Player.new
-  #   game = Greed.new(bert, ernie)
-  #   assert_equal false, bert.in_game?
-  #   game.round
-  #   game.round
-  #   game.round
-  #   assert_equal true, bert.in_game?
-  # end
+class GameError < StandardError
 end
 
 class AboutDice < Neo::Koan
@@ -251,13 +166,63 @@ class AboutScoring < Neo::Koan
     assert_equal 250, score([2,5,2,2,3])[:score]
     assert_equal 550, score([5,5,5,5])[:score]
   end
+end
+
+class AboutPlayers < Neo::Koan
+  def test_can_create_a_player
+    bob = Player.new
+    assert_not_nil bob
+  end
+
+  def test_player_starts_with_certain_attributes
+    bob = Player.new
+
+    assert_equal 0, bob.turn_score
+    assert_equal 0, bob.total_score
+    assert_not_nil bob.dice
+    assert_equal false, bob.in_game?
+  end
+
+  def test_player_can_roll_dice_to_score
+    bob = Player.new
+
+    tally_before = bob.turn_score
+    score = bob.roll
+
+    assert_equal true, bob.turn_score == tally_before + score
+  end
+
+  def test_roll_multiple_times_to_accumulate_score
+    bob = Player.new
+    scores = []
+    while bob.has_turn? do
+      scores << bob.roll
+    end
+
+    assert_equal bob.turn_score, scores.inject(0) { |total, s| total + s }, scores
+  end
+
+  def test_player_can_get_in_the_game
+    bob = Player.new
+    scores = []
+    total_before = bob.total_score
+
+    while bob.has_turn? do
+      scores << bob.roll
+    end
+    bob.end_turn
+
+    assert_equal total_before + bob.turn_score, bob.total_score if bob.turn_score >= 300
+    assert_equal 0, bob.total_score if bob.turn_score < 300
+    assert false, "The score values were #{scores}"
+  end
 
   def test_this_surfaces_some_values
     score = Player.new.roll
     assert_equal -1, score[:score]
   end
 
-	def test_this_is_just_to_avoid_end_screen
-		assert false, "Keep working"
-	end
+  def test_this_is_just_to_avoid_end_screen
+    assert false, "Keep working"
+  end
 end
